@@ -134,6 +134,7 @@ class Game:
 
     def pause(self, heading, subheading):
         # Pause and display game over screen
+        global lets_continue
         dark_yellow = pygame.Color("#938f0c")
         heading_text = self.potter_font.render(heading, True, dark_yellow)
         heading_rect = heading_text.get_rect(center=(width // 2, height // 2))
