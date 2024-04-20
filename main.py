@@ -1,13 +1,16 @@
 import pygame
 import random
 
+# Initialize Pygame
 pygame.init()
 
+# Set the screen dimensions
 width = 1200
 height = 700
 screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Bitva s mozkomory")
+pygame.display.set_caption("Battle with mozkomors")  # Set the window caption
 
+# Set frames per second
 fps = 60
 clock = pygame.time.Clock()
 
@@ -20,35 +23,44 @@ class Game:
         self.slow_down_cycle = 0
         self.player = player
         self.group_mozkomors = group_mozkomors
+
+        # Background music setup
         pygame.mixer.music.load("media/bg-music-hp.wav")
-        pygame.mixer.music.play(-1)
+        pygame.mixer.music.play(-1)  # Loop the background music indefinitely
+
+        # Load custom font
         self.potter_font = pygame.font.Font("fonts/Harry.ttf", 24)
 
+        # Load background image
+        self.bg_image = pygame.image.load("img/bg-dementors.png")
+
+        # Load images for different types of 'mozkomors'
         blue_image = pygame.image.load("img/mozkomor-modry.png")
         green_image = pygame.image.load("img/mozkomor-zeleny.png")
         purple_image = pygame.image.load("img/mozkomor-ruzovy.png")
         yellow_image = pygame.image.load("img/mozkomor-zluty.png")
         self.mozkomors_images = [blue_image, green_image, purple_image, yellow_image]
+
+        # Randomly select a target 'mozkomor' for catching
         self.mozkomor_catcht = random.randint(0, 3)
         self.mozkomor_catch_image = self.mozkomors_images[self.mozkomor_catcht]
         self.mozkomor_catch_image_rect = self.mozkomor_catch_image.get_rect(center=(width // 2, 57))
 
     def update(self):
         self.slow_down_cycle += 1
-        if self.slow_down_cycle == fps:
+        if self.slow_down_cycle == fps:  # Increment round time every second
             self.round_time += 1
             self.slow_down_cycle = 0
 
-        self.check_collision()
+        self.check_collision()  # Check for collisions between player and mozkomors
 
     def draw(self):
+        # Define colors for text and UI elements
         dark_yellow = pygame.Color("#938f0c")
-        blue = pygame.Color(21, 31, 217)
-        green = pygame.Color(24, 194, 38)
-        purple = pygame.Color(195, 23, 189)
-        yellow = pygame.Color(195, 181, 23)
-        colors = [blue, green, purple, yellow]
+        colors = [pygame.Color(21, 31, 217), pygame.Color(24, 194, 38), pygame.Color(195, 23, 189),
+                  pygame.Color(195, 181, 23)]
 
+        # Render and place text for game info
         catch_text = self.potter_font.render("Catch this mozkomor!", True, dark_yellow)
         catch_text_rect = catch_text.get_rect(center=(width // 2, 17))
         screen.blit(catch_text, catch_text_rect)
@@ -73,24 +85,82 @@ class Game:
         back_szone_text_rect = back_szone_text.get_rect(topright=(width - 10, 30))
         screen.blit(back_szone_text, back_szone_text_rect)
 
+        # Draw the target 'mozkomor' and highlight it
         screen.blit(self.mozkomor_catch_image, self.mozkomor_catch_image_rect)
-
-        pygame.draw.rect(screen, colors[self.mozkomor_catcht], (0, 100, width, height-200), 4)
+        pygame.draw.rect(screen, colors[self.mozkomor_catcht], (0, 100, width, height - 200), 4)
 
     def check_collision(self):
-        pass
+        # Collision detection logic
+        colidded_mozkomor = pygame.sprite.spritecollideany(self.player, self.group_mozkomors)
+        if colidded_mozkomor:
+            if colidded_mozkomor.type == self.mozkomor_catcht:
+                self.player.catch_sound.play()
+                self.score += 5 * self.round
+                colidded_mozkomor.remove(self.group_mozkomors)
+                if self.group_mozkomors:
+                    self.choose_new_target()
+                else:
+                    self.player.reset()
+                    self.start_new_round()
+            else:
+                self.player.wrong_sound.play()
+                self.player.lives -= 1
+                if self.player.lives <= 0:
+                    self.pause(f"Achieved score: {self.score}", "Press enter to play again!")
+                    self.reset()
+                self.player.reset()
 
     def start_new_round(self):
-        pass
+        # Logic to start a new game round
+        self.score += int(100 * (self.round / (1 + self.round_time)))
+        self.round_time = 0
+        self.slow_down_cycle = 0
+        self.round += 1
+        self.player.safezones += 1
+        for deleted_mozkomor in self.group_mozkomors:
+            self.group_mozkomors.remove(deleted_mozkomor)
+        for _ in range(self.round):
+            for i in range(4):
+                self.group_mozkomors.add(
+                    Mozkomor(random.randint(0, width - 64), random.randint(100, height - 164), self.mozkomors_images[i],
+                             i))
+        self.choose_new_target()
 
     def choose_new_target(self):
-        pass
+        # Select a new target mozkomor from the group
+        new_mozkomor_catch = random.choice(self.group_mozkomors.sprites())
+        self.mozkomor_catcht = new_mozkomor_catch.type
+        self.mozkomor_catch_image = new_mozkomor_catch.image
 
-    def pause(self):
-        pass
+    def pause(self, heading, subheading):
+        # Pause and display game over screen
+        dark_yellow = pygame.Color("#938f0c")
+        heading_text = self.potter_font.render(heading, True, dark_yellow)
+        heading_rect = heading_text.get_rect(center=(width // 2, height // 2))
+        subheading_text = self.potter_font.render(subheading, True, dark_yellow)
+        subheading_rect = subheading_text.get_rect(center=(width // 2, height // 2 + 60))
+        screen.fill("black")
+        screen.blit(heading_text, heading_rect)
+        screen.blit(subheading_text, subheading_rect)
+        pygame.display.update()
+        paused = True
+        while paused:
+            for event_paused in pygame.event.get():
+                if event_paused.type == pygame.KEYDOWN:
+                    if event_paused.key == pygame.K_RETURN:
+                        paused = False
+                if event_paused.type == pygame.QUIT:
+                    paused = False
+                    lets_continue = False
 
     def reset(self):
-        pass
+        # Reset the game state
+        self.score = 0
+        self.round = 0
+        self.player.lives = 5
+        self.player.safezones = 3
+        pygame.mixer.music.play(-1)
+        self.start_new_round()
 
 
 class Player(pygame.sprite.Sprite):
@@ -103,7 +173,7 @@ class Player(pygame.sprite.Sprite):
         self.speed = 8
         self.catch_sound = pygame.mixer.Sound("media/expecto-patronum.mp3")
         self.catch_sound.set_volume(0.1)
-        self.wrong_sound = pygame.mixer.Sound("media/success_click.wav")
+        self.wrong_sound = pygame.mixer.Sound("media/wrong.wav")
         self.wrong_sound.set_volume(0.1)
 
     def update(self):
@@ -146,32 +216,26 @@ class Mozkomor(pygame.sprite.Sprite):
             self.y *= -1
 
 
-mozkomor_group = pygame.sprite.Group()
-one_mozkomor = Mozkomor(500, 500, pygame.image.load("img/mozkomor-modry.png"), 0)
-mozkomor_group.add(one_mozkomor)
-one_mozkomor = Mozkomor(500, 500, pygame.image.load("img/mozkomor-zeleny.png"), 1)
-mozkomor_group.add(one_mozkomor)
-one_mozkomor = Mozkomor(500, 500, pygame.image.load("img/mozkomor-ruzovy.png"), 2)
-mozkomor_group.add(one_mozkomor)
-one_mozkomor = Mozkomor(500, 500, pygame.image.load("img/mozkomor-zluty.png"), 3)
-mozkomor_group.add(one_mozkomor)
+lets_continue = True
 
+mozkomor_group = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
 one_player = Player()
 player_group.add(one_player)
 
 my_game = Game(one_player, mozkomor_group)
+my_game.pause("Harry Potter and battle with mozkomors", "Press enter to play!")
+my_game.start_new_round()
 
-pokracovat = True
-while pokracovat:
+while lets_continue:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            pokracovat = False
+            lets_continue = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 one_player.safe_zone()
 
-    screen.fill("black")
+    screen.blit(my_game.bg_image, (0,0))
     mozkomor_group.draw(screen)
     mozkomor_group.update()
     player_group.draw(screen)
